@@ -6,7 +6,7 @@ services:
     container_name: commute
     privileged: true
     devices:
-      - /dev/video0:/dev/video0  # Video capture device
+      - /dev/video2:/dev/video0  # Video capture device
       - /dev/lirc0:/dev/lirc0    # IR blaster device
       - /dev/bus/usb:/dev/bus/usb # USB devices
     volumes:
