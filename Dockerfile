@@ -3,11 +3,14 @@ FROM python:3.11-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     lirc \
+    alsa-utils \
     v4l-utils \
     libopencv-dev \
     python3-opencv \
     ffmpeg \
     usbutils \
+    alsa-utils \
+    portaudio19-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -24,7 +27,7 @@ COPY commute.py .
 COPY config/ config/
 
 # Create necessary directories
-RUN mkdir -p /app/logs /app/config
+RUN mkdir -p /app/logs /app/config /app/data
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

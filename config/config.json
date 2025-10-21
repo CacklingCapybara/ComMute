@@ -8,5 +8,9 @@
   "detection_buffer": 2,
   "fps": 30,
   "detection_sensitivity": "medium",
-  "log_level": "INFO"
+  "log_level": "DEBUG",
+  "audio_fingerprinting_enabled": true,
+  "fingerprint_db_path": "/app/data/dejavu.db",
+  "audio_check_interval": 3,
+  "audio_device": "hw:1,0"
 }

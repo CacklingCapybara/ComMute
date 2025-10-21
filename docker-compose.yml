@@ -1,21 +1,24 @@
-version: '3.8'
-
 services:
   commute:
     build: .
     container_name: commute
     privileged: true
     devices:
-      - /dev/video2:/dev/video0  # Video capture device
+      - /dev/video0:/dev/video0  # Video capture device
       - /dev/lirc0:/dev/lirc0    # IR blaster device
       - /dev/bus/usb:/dev/bus/usb # USB devices
+      - /dev/snd:/dev/snd        # Audio devices
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config
+      - ./data:/app/data         # Fingerprint database
       - /etc/lirc:/etc/lirc:ro   # LIRC configuration
+      - /home/collin/dockercomposefiles/commute/dejavu.db:/app/data/dejavu.db
+      - /home/collin/dockercomposefiles/commute/commercialrecordings:/commercialrecordings
+      # - ./dejavu.db:/app/data/dejavu.db
     restart: unless-stopped
     environment:
-      - TZ=America/New_York
+      - TZ=America/Chicago
     networks:
       - commute-net
 
