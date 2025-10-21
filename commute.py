@@ -82,6 +82,7 @@ class CommercialDetector:
         self.scene_change_threshold = config.get('scene_change_threshold', 0.3)
         self.volume_spike_threshold = config.get('volume_spike_threshold', 1.5)
         self.detection_confidence = 0.0
+        self.commercial_probability = 0.0  # Current probability (0.0 - 1.0)
         self.commercial_start_time = None
         self.in_commercial = False
         
@@ -107,16 +108,34 @@ class CommercialDetector:
         
         self.prev_frame = gray.copy()
         
-        # Calculate recent cut rate
+        # Calculate recent cut rate and probability
+        cut_rate = 0.0
         if len(self.cut_rate_window) >= 150:  # 5 seconds
             recent_cuts = sum(list(self.cut_rate_window)[-150:])
             cut_rate = recent_cuts / 5.0  # cuts per second
             
+            # Calculate commercial probability based on cut rate
+            # Regular programming: 0.5-1.5 cuts/sec → low probability
+            # Commercials: 2-4+ cuts/sec → high probability
+            if cut_rate < 1.5:
+                self.commercial_probability = 0.0
+            elif cut_rate < 2.0:
+                # Transition zone
+                self.commercial_probability = (cut_rate - 1.5) / 0.5 * 0.5  # 0.0 to 0.5
+            elif cut_rate < 3.0:
+                # Likely commercial
+                self.commercial_probability = 0.5 + (cut_rate - 2.0) / 1.0 * 0.3  # 0.5 to 0.8
+            else:
+                # Very likely commercial
+                self.commercial_probability = min(0.8 + (cut_rate - 3.0) / 2.0 * 0.2, 1.0)  # 0.8 to 1.0
+            
             # Commercials typically have 2-4+ cuts per second
             if cut_rate > 2.0:
                 return True, cut_rate
+        else:
+            self.commercial_probability = 0.0
         
-        return False, 0.0
+        return False, cut_rate
     
     def detect_black_frames(self, frame):
         """Detect black frames (often transition to/from commercials)"""
@@ -217,6 +236,7 @@ class ComMute:
         frame_count = 0
         commercial_frame_streak = 0
         min_commercial_frames = self.config.get('min_commercial_duration', 5) * self.config.get('fps', 30)
+        last_probability_log = time.time()
         
         while self.running:
             ret, frame = self.video_capture.read()
@@ -230,6 +250,15 @@ class ComMute:
             
             # Analyze frame
             is_commercial, confidence = self.detector.analyze_frame(frame)
+            
+            # Log commercial probability every 1 second
+            current_time = time.time()
+            if current_time - last_probability_log >= 1.0:
+                probability_pct = self.detector.commercial_probability * 100
+                status = "COMMERCIAL" if self.detector.in_commercial else "PROGRAM"
+                mute_status = "MUTED" if self.ir_controller.is_muted else "UNMUTED"
+                logger.info(f"Commercial Probability: {probability_pct:.1f}% | Status: {status} | Audio: {mute_status}")
+                last_probability_log = current_time
             
             if is_commercial or self.detector.is_commercial_likely():
                 commercial_frame_streak += 1
