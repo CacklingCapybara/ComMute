@@ -7,8 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SoundFingerprinting" Version="9.3.4" />
-    <PackageReference Include="SoundFingerprinting.Audio.Bass" Version="9.3.4" />
+    <PackageReference Include="SoundFingerprinting" Version="12.6.0" />
   </ItemGroup>
 
 </Project>
