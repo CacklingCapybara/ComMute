@@ -4,26 +4,27 @@ using Microsoft.Extensions.DependencyInjection;
 using SoundFingerprinting;
 using SoundFingerprinting.Audio;
 using SoundFingerprinting.Builder;
-using SoundFingerprinting.Configuration;
-using SoundFingerprinting.Data;
 using SoundFingerprinting.InMemory;
+using SoundFingerprinting.Data;
 using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Configure services
 builder.Services.AddSingleton<IModelService>(new InMemoryModelService());
 builder.Services.AddSingleton<IAudioService>(new SoundFingerprintingAudioService());
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
 var modelService = app.Services.GetRequiredService<IModelService>();
 var audioService = app.Services.GetRequiredService<IAudioService>();
+
+// Keep track of fingerprinted items manually since InMemoryModelService doesn't expose tracks list
+var trackRegistry = new Dictionary<string, (string Title, string Artist)>();
 
 // Health check endpoint
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "fingerprint" }));
@@ -56,7 +57,8 @@ app.MapPost("/fingerprint", async (HttpRequest request) =>
         try
         {
             // Create track info
-            var track = new TrackInfo(Guid.NewGuid().ToString(), name, "Commercial");
+            var trackId = Guid.NewGuid().ToString();
+            var track = new TrackInfo(trackId, name, "Commercial");
 
             // Generate fingerprints
             var avHashes = await FingerprintCommandBuilder.Instance
@@ -67,12 +69,15 @@ app.MapPost("/fingerprint", async (HttpRequest request) =>
 
             // Store in database
             modelService.Insert(track, avHashes);
+            
+            // Store in our registry
+            trackRegistry[trackId] = (name, "Commercial");
 
             return Results.Ok(new
             {
                 success = true,
                 name = name,
-                trackId = track.Id,
+                trackId = trackId,
                 hashesCount = avHashes.Audio?.Count ?? 0
             });
         }
@@ -129,18 +134,20 @@ app.MapPost("/query", async (HttpRequest request) =>
                 .UsingServices(modelService, audioService)
                 .Query();
 
-            if (queryResult.BestMatch != null && queryResult.BestMatch.Confidence > 0.5)
+            // Check if we have matches
+            if (queryResult.ContainsMatches && queryResult.BestMatch != null)
             {
                 var bestMatch = queryResult.BestMatch;
+                
                 return Results.Ok(new
                 {
                     match = true,
                     name = bestMatch.Track.Title,
                     trackId = bestMatch.Track.Id,
-                    confidence = bestMatch.Confidence,
-                    matchedAt = bestMatch.MatchedAt,
-                    queryLength = queryResult.QueryLength,
-                    coverageLength = bestMatch.Coverage.BestPath.Length
+                    confidence = bestMatch.Score,
+                    matchedAt = bestMatch.TrackMatchStartsAt,
+                    queryLength = bestMatch.QueryLength,
+                    coverageLength = bestMatch.TrackCoverageWithPermittedGapsLength
                 });
             }
             else
@@ -176,12 +183,11 @@ app.MapGet("/commercials", () =>
 {
     try
     {
-        var tracks = modelService.ReadAllTracks();
-        var commercials = tracks.Select(t => new
+        var commercials = trackRegistry.Select(kvp => new
         {
-            id = t.Id,
-            name = t.Title,
-            artist = t.Artist
+            id = kvp.Key,
+            name = kvp.Value.Title,
+            artist = kvp.Value.Artist
         }).ToList();
 
         return Results.Ok(new
@@ -205,8 +211,7 @@ app.MapDelete("/commercial/{trackId}", (string trackId) =>
 {
     try
     {
-        var track = modelService.ReadTrackById(trackId);
-        if (track == null)
+        if (!trackRegistry.ContainsKey(trackId))
         {
             return Results.NotFound(new { error = "Commercial not found" });
         }
@@ -234,11 +239,11 @@ app.MapGet("/stats", () =>
 {
     try
     {
-        var tracks = modelService.ReadAllTracks().ToList();
         return Results.Ok(new
         {
-            totalCommercials = tracks.Count,
+            totalCommercials = trackRegistry.Count,
             service = "SoundFingerprinting",
+            version = "12.6.0",
             storage = "InMemory"
         });
     }
