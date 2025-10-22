@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SoundFingerprinting" Version="9.3.4" />
+    <PackageReference Include="SoundFingerprinting.Audio.Bass" Version="9.3.4" />
+  </ItemGroup>
+
+</Project>

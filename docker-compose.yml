@@ -1,4 +1,15 @@
 services:
+  fingerprint:
+    build:
+      context: ./FingerprintService
+      dockerfile: Dockerfile
+    container_name: commute_fingerprint
+    restart: unless-stopped
+    networks:
+      - commute-net
+    ports:
+      - "5000:5000"
+
   commute:
     build: .
     container_name: commute
@@ -11,14 +22,12 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config
-      - ./data:/app/data         # Fingerprint database
       - /etc/lirc:/etc/lirc:ro   # LIRC configuration
-      - /home/collin/dockercomposefiles/commute/dejavu.db:/app/data/dejavu.db
-      - /home/collin/dockercomposefiles/commute/commercialrecordings:/commercialrecordings
-      # - ./dejavu.db:/app/data/dejavu.db
     restart: unless-stopped
     environment:
       - TZ=America/Chicago
+    depends_on:
+      - fingerprint
     networks:
       - commute-net
 

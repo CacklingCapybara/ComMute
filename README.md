@@ -17,6 +17,14 @@ ComMute uses multiple heuristics to detect commercials:
 1. **Scene Change Detection**: Commercials have more rapid scene changes than regular programming
 2. **Cut Rate Analysis**: Measures editing pace (cuts per second)
 3. **Black Frame Detection**: Identifies transitions between program and commercials
+4. **Audio Fingerprinting**: Matches audio against known commercial database using SoundFingerprinting (.NET service)
+
+### Docker Services
+
+- **commute**: Main Python application (video/audio processing, IR control)
+- **commute_fingerprint**: .NET microservice for audio fingerprinting (SoundFingerprinting library)
+
+The hybrid architecture allows ComMute to leverage the best of both worlds: Python's simplicity for video processing and .NET's powerful SoundFingerprinting library for audio recognition.
 
 ## Prerequisites
 

@@ -9,8 +9,6 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     usbutils \
     alsa-utils \
-    portaudio19-dev \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -22,15 +20,12 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Dejavu from GitHub (Python 3 compatible)
-RUN pip install --no-cache-dir git+https://github.com/worldveil/dejavu.git#egg=PyDejavu
-
 # Copy application files
 COPY commute.py .
 COPY config/ config/
 
 # Create necessary directories
-RUN mkdir -p /app/logs /app/config /app/data
+RUN mkdir -p /app/logs /app/config
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

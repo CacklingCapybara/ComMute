@@ -34,16 +34,18 @@ Note the card and device numbers (e.g., `hw:1,0` for card 1, device 0).
 
 ### 2. Update Configuration
 
-Edit `config/config.json`:
+Config is automatically set for the fingerprint service. Default `config/config.json`:
 
 ```json
 {
   "audio_fingerprinting_enabled": true,
   "audio_device": "hw:1,0",
   "audio_check_interval": 3,
-  "fingerprint_db_path": "/app/data/dejavu.db"
+  "fingerprint_service_url": "http://fingerprint:5000"
 }
 ```
+
+The fingerprint service is accessible on port 5000 inside the Docker network.
 
 ### 3. Test Audio Capture
 
@@ -173,6 +175,12 @@ View real-time detection in the logs:
 # Follow logs
 docker-compose logs -f
 
+# Just ComMute logs
+docker-compose logs -f commute
+
+# Just fingerprint service logs
+docker-compose logs -f fingerprint
+
 # Or check the log file
 tail -f logs/commute.log
 ```
@@ -183,6 +191,21 @@ Look for:
 - `Audio fingerprint match detected!` - Match found
 - `Audio match found: [Name]` - Which commercial was matched
 
+### Fingerprint Service API
+
+You can also query the fingerprint service directly:
+
+```bash
+# Health check
+curl http://localhost:5000/health
+
+# List all commercials
+curl http://localhost:5000/commercials
+
+# Get statistics
+curl http://localhost:5000/stats
+```
+
 ## Configuration Options
 
 ```json
@@ -190,7 +213,7 @@ Look for:
   "audio_fingerprinting_enabled": true,     // Enable/disable feature
   "audio_device": "hw:1,0",                 // ALSA audio device
   "audio_check_interval": 3,                // Check every N seconds
-  "fingerprint_db_path": "/app/data/dejavu.db"  // Database location
+  "fingerprint_service_url": "http://fingerprint:5000"  // Fingerprint service URL
 }
 ```
 
@@ -241,18 +264,37 @@ Reduce check frequency:
 
 Or disable audio fingerprinting and use visual detection only.
 
+### Service Issues
+
+Restart the fingerprint service:
+```bash
+docker-compose restart fingerprint
+```
+
+Check if service is responding:
+```bash
+curl http://localhost:5000/health
+```
+
 ### Database Issues
 
-Reset the database if corrupted:
+The fingerprint service uses in-memory storage by default. To clear all fingerprints:
 ```bash
-# Stop ComMute
-docker-compose down
+# Restart the fingerprint service
+docker-compose restart fingerprint
+```
 
-# Remove database
-rm data/dejavu.db
+**Note**: In-memory storage means fingerprints are lost on restart. For production use, consider implementing persistent storage or backing up fingerprints via the API.
 
-# Restart and re-fingerprint commercials
-docker-compose up -d
+### List All Commercials
+
+```bash
+docker exec commute python commute.py --list-commercials
+```
+
+Or via API:
+```bash
+curl http://localhost:5000/commercials
 ```
 
 ## Statistics
@@ -287,7 +329,10 @@ A: Start with 20-30 of the most frequent ones. More is better, but diminishing r
 A: Only when new commercials appear. Fingerprints are permanent.
 
 **Q: Can I share my database?**
-A: Yes! The `data/dejavu.db` file can be copied to other ComMute installations.
+A: Yes! Export with `pg_dump` and share the SQL file. Others can import it with `psql`.
+
+**Q: Why PostgreSQL instead of SQLite?**
+A: Dejavu's official Docker setup uses PostgreSQL, which ensures better compatibility and easier setup.
 
 **Q: Does this work with streaming services?**
 A: Yes, if you're capturing their output via HDMI.

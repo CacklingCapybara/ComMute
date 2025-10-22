@@ -1,4 +1,13 @@
-#!/usr/bin/env python3
+def main():
+    """Entry point"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='ComMute - Commercial Detection and Auto-Mute')
+    parser.add_argument('--fingerprint', metavar='AUDIO_FILE', 
+                       help='Fingerprint a commercial audio file')
+    parser.add_argument('--name', metavar='COMMERCIAL_NAME',
+                       help='Name for the commercial being fingerprinted')
+    parser#!/usr/bin/env python3
 """
 ComMute - Commercial Detection and Auto-Mute System
 Detects commercials in live TV feed and mutes audio via IR blaster
@@ -15,10 +24,8 @@ import threading
 import json
 import os
 import tempfile
-from dejavu import Dejavu
-from dejavu.logic.recognizer.file_recognizer import FileRecognizer
 import wave
-import struct
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -179,33 +186,37 @@ class CommercialDetector:
 
 
 class AudioFingerprinter:
-    """Handles audio fingerprinting using Dejavu"""
+    """Handles audio fingerprinting using SoundFingerprinting service"""
     
     def __init__(self, config):
         self.config = config
         self.enabled = config.get('audio_fingerprinting_enabled', True)
+        self.service_url = config.get('fingerprint_service_url', 'http://fingerprint:5000')
         
         if not self.enabled:
             logger.info("Audio fingerprinting disabled in config")
             return
         
-        # Initialize Dejavu with database config
-        db_config = {
-            'type': 'sqlite',
-            'database': config.get('fingerprint_db_path', '/app/data/dejavu.db')
-        }
-        
-        try:
-            self.djv = Dejavu(db_config)
-            logger.info("Audio fingerprinting initialized with Dejavu")
-        except Exception as e:
-            logger.error(f"Failed to initialize Dejavu: {e}")
-            self.enabled = False
-            return
+        # Wait for service to be ready
+        max_retries = 30
+        for i in range(max_retries):
+            try:
+                response = requests.get(f"{self.service_url}/health", timeout=2)
+                if response.status_code == 200:
+                    logger.info("Audio fingerprinting service connected")
+                    break
+            except Exception as e:
+                if i < max_retries - 1:
+                    logger.info(f"Waiting for fingerprint service... ({i+1}/{max_retries})")
+                    time.sleep(2)
+                else:
+                    logger.error(f"Failed to connect to fingerprint service: {e}")
+                    self.enabled = False
+                    return
         
         self.audio_buffer = []
         self.sample_rate = 44100
-        self.check_interval = config.get('audio_check_interval', 3)  # Check every 3 seconds
+        self.check_interval = config.get('audio_check_interval', 3)
         self.last_check_time = 0
     
     def add_audio_sample(self, audio_data):
@@ -215,7 +226,7 @@ class AudioFingerprinter:
         
         self.audio_buffer.extend(audio_data)
         
-        # Keep approximately 3 seconds of audio
+        # Keep approximately check_interval seconds of audio
         max_samples = self.sample_rate * self.check_interval
         if len(self.audio_buffer) > max_samples:
             self.audio_buffer = self.audio_buffer[-max_samples:]
@@ -247,20 +258,29 @@ class AudioFingerprinter:
                     audio_array = np.clip(audio_array * 32767, -32768, 32767).astype(np.int16)
                     wav_file.writeframes(audio_array.tobytes())
             
-            # Recognize audio
-            results = self.djv.recognize(FileRecognizer, tmp_path)
+            # Query fingerprint service
+            with open(tmp_path, 'rb') as f:
+                files = {'file': ('query.wav', f, 'audio/wav')}
+                data = {'seconds': self.check_interval}
+                response = requests.post(
+                    f"{self.service_url}/query",
+                    files=files,
+                    data=data,
+                    timeout=5
+                )
             
             # Clean up temp file
             os.unlink(tmp_path)
             
-            if results and results.get('song_name'):
-                confidence = results.get('input_confidence', 0)
-                logger.info(f"Audio match found: {results['song_name']} (confidence: {confidence})")
-                return {
-                    'name': results['song_name'],
-                    'confidence': confidence,
-                    'offset': results.get('offset_seconds', 0)
-                }
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('match'):
+                    logger.info(f"Audio match found: {result['name']} (confidence: {result['confidence']:.2f})")
+                    return {
+                        'name': result['name'],
+                        'confidence': result['confidence'],
+                        'matchedAt': result.get('matchedAt', 0)
+                    }
             
         except Exception as e:
             logger.error(f"Error checking audio fingerprint: {e}")
@@ -274,12 +294,42 @@ class AudioFingerprinter:
             return False
         
         try:
-            self.djv.fingerprint_file(audio_file_path, commercial_name)
-            logger.info(f"Fingerprinted commercial: {commercial_name}")
-            return True
+            with open(audio_file_path, 'rb') as f:
+                files = {'file': (os.path.basename(audio_file_path), f, 'audio/wav')}
+                data = {'name': commercial_name}
+                response = requests.post(
+                    f"{self.service_url}/fingerprint",
+                    files=files,
+                    data=data,
+                    timeout=30
+                )
+            
+            if response.status_code == 200:
+                result = response.json()
+                logger.info(f"Fingerprinted commercial: {commercial_name} ({result.get('hashesCount', 0)} hashes)")
+                return True
+            else:
+                logger.error(f"Fingerprinting failed: {response.text}")
+                return False
+                
         except Exception as e:
             logger.error(f"Error fingerprinting file: {e}")
             return False
+    
+    def list_commercials(self):
+        """List all fingerprinted commercials"""
+        if not self.enabled:
+            return []
+        
+        try:
+            response = requests.get(f"{self.service_url}/commercials", timeout=5)
+            if response.status_code == 200:
+                result = response.json()
+                return result.get('commercials', [])
+        except Exception as e:
+            logger.error(f"Error listing commercials: {e}")
+        
+        return []
 
 
 class ComMute:
@@ -319,9 +369,9 @@ class ComMute:
             'detection_buffer': 2,  # seconds before muting
             'fps': 30,
             'audio_fingerprinting_enabled': True,
-            'fingerprint_db_path': '/app/data/dejavu.db',
             'audio_check_interval': 3,
-            'audio_device': 'hw:1,0'  # ALSA audio device for capture card
+            'audio_device': 'hw:1,0',  # ALSA audio device for capture card
+            'fingerprint_service_url': 'http://fingerprint:5000'
         }
         
         try:
@@ -554,12 +604,35 @@ def main():
                        help='Fingerprint a commercial audio file')
     parser.add_argument('--name', metavar='COMMERCIAL_NAME',
                        help='Name for the commercial being fingerprinted')
+    parser.add_argument('--list-commercials', action='store_true',
+                       help='List all fingerprinted commercials')
     args = parser.parse_args()
     
     # Create necessary directories
     os.makedirs('/app/logs', exist_ok=True)
     os.makedirs('/app/config', exist_ok=True)
-    os.makedirs('/app/data', exist_ok=True)
+    
+    # Handle list commercials
+    if args.list_commercials:
+        config_path = '/app/config/config.json'
+        default_config = {
+            'audio_fingerprinting_enabled': True,
+            'fingerprint_service_url': 'http://fingerprint:5000'
+        }
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                default_config.update(json.load(f))
+        
+        fingerprinter = AudioFingerprinter(default_config)
+        commercials = fingerprinter.list_commercials()
+        
+        if commercials:
+            logger.info(f"Found {len(commercials)} fingerprinted commercials:")
+            for comm in commercials:
+                logger.info(f"  - {comm['name']} (ID: {comm['id']})")
+        else:
+            logger.info("No commercials fingerprinted yet")
+        return
     
     # Handle fingerprinting mode
     if args.fingerprint:
@@ -573,7 +646,7 @@ def main():
         # Load config
         default_config = {
             'audio_fingerprinting_enabled': True,
-            'fingerprint_db_path': '/app/data/dejavu.db'
+            'fingerprint_service_url': 'http://fingerprint:5000'
         }
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
