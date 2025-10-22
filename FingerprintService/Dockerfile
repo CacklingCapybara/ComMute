@@ -16,11 +16,21 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 
-# Install audio dependencies
+# Install ffmpeg for audio processing
 RUN apt-get update && apt-get install -y \
-    libbass.so \
     ffmpeg \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Download and install BASS library (required by SoundFingerprinting.Audio.Bass)
+RUN wget http://www.un4seen.com/files/bass24-linux.zip && \
+    apt-get update && apt-get install -y unzip && \
+    unzip bass24-linux.zip && \
+    cp bass/x64/libbass.so /usr/lib/ && \
+    rm -rf bass24-linux.zip bass && \
+    apt-get remove -y unzip wget && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --from=publish /app/publish .
 
