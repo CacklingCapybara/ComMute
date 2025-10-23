@@ -23,7 +23,6 @@ services:
     image: addictedcs/soundfingerprinting.emy:latest
     container_name: soundfingerprinting
     ports:
-      - "5000:5000"
       - "3399:3399"
       - "3340:3340"
     volumes:

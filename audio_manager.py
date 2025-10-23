@@ -1,5 +1,3 @@
-
-
 import pyaudio
 import wave
 import numpy as np
@@ -74,6 +72,23 @@ class AudioManager:
             return audio_array
         except Exception as e:
             logger.error(f"Error capturing audio: {e}")
+            return None
+    
+    def save_buffer_to_file(self, buffer, filename):
+        """Save audio buffer to WAV file"""
+        try:
+            audio_data = np.concatenate(buffer)
+            
+            wf = wave.open(filename, 'wb')
+            wf.setnchannels(self.channels)
+            wf.setsampwidth(2)  # 16-bit
+            wf.setframerate(self.rate)
+            wf.writeframes(audio_data.tobytes())
+            wf.close()
+            
+            return filename
+        except Exception as e:
+            logger.error(f"Failed to save buffer: {e}")
             return None
     
     def record_to_file(self, duration=15, output_path='/recordings'):

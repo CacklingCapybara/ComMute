@@ -1,5 +1,3 @@
-
-
 from flask import Flask, render_template, jsonify, request, send_file
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
@@ -43,12 +41,13 @@ app_state = {
     'config': {
         'audio_device': 'default',
         'matching_threshold': 0.85,
-        'docker_endpoint': 'http://soundfingerprinting:5000',
+        'docker_endpoint': 'http://soundfingerprinting:3340',
         'database_path': '/data/commercials.db',
         'latency_target': 3,
         'enable_telemetry': False,
         'recording_path': '/recordings',
-        'recording_duration': 15
+        'recording_duration': 15,
+        'chunk_duration': 10  # Capture 10 seconds of audio before querying
     }
 }
 
@@ -65,6 +64,9 @@ def add_log(message, log_type='info'):
     logger.info(f"[{log_type}] {message}")
 
 def monitoring_loop():
+    chunk_buffer = []
+    chunk_duration = app_state['config']['chunk_duration']
+    
     while app_state['is_running']:
         try:
             # Capture audio chunk
@@ -74,34 +76,52 @@ def monitoring_loop():
                 time.sleep(0.1)
                 continue
             
-            # Send to fingerprinting service
-            result = fingerprint_client.match_audio(audio_data)
+            chunk_buffer.append(audio_data)
             
-            if result and result.get('is_match'):
-                confidence = result.get('confidence', 0)
-                duration = result.get('duration', 30)
+            # Calculate if we have enough audio (~10 seconds)
+            samples_needed = int(chunk_duration * audio_manager.rate / audio_manager.chunk)
+            
+            if len(chunk_buffer) >= samples_needed:
+                # Save buffer to temp file for querying
+                temp_file = audio_manager.save_buffer_to_file(
+                    chunk_buffer,
+                    '/tmp/query_chunk.wav'
+                )
                 
-                if confidence >= app_state['config']['matching_threshold']:
-                    handle_commercial_detected(confidence, duration)
-                    time.sleep(duration)
-                    handle_commercial_ended(duration)
+                if temp_file:
+                    # Query the fingerprinting service
+                    result = fingerprint_client.match_audio(temp_file)
+                    
+                    if result and result.get('is_match'):
+                        confidence = result.get('confidence', 0)
+                        duration = int(result.get('duration', 30))
+                        track_title = result.get('track_title', 'Unknown Commercial')
+                        
+                        if confidence >= app_state['config']['matching_threshold']:
+                            handle_commercial_detected(confidence, duration, track_title)
+                            time.sleep(duration)
+                            handle_commercial_ended(duration)
+                
+                # Clear buffer and continue
+                chunk_buffer = []
             
-            time.sleep(0.5)
+            time.sleep(0.1)
             
         except Exception as e:
             logger.error(f"Error in monitoring loop: {e}")
             add_log(f"Error in monitoring: {str(e)}", 'error')
             time.sleep(1)
 
-def handle_commercial_detected(confidence, duration):
+def handle_commercial_detected(confidence, duration, track_title='Unknown'):
     app_state['status'] = 'muted'
     app_state['current_mute'] = {
         'start': time.time(),
-        'duration': duration
+        'duration': duration,
+        'title': track_title
     }
     
     mute_controller.mute()
-    add_log(f"Commercial detected (confidence: {confidence:.2f}) - Muted", 'mute')
+    add_log(f"Commercial detected: '{track_title}' (confidence: {confidence:.2f}) - Muted", 'mute')
     socketio.emit('status_update', {
         'status': 'muted',
         'current_mute': app_state['current_mute']
@@ -240,6 +260,39 @@ def clear_data():
     add_log('Data cleared', 'info')
     return jsonify({'success': True})
 
+@app.route('/api/add-commercial', methods=['POST'])
+def add_commercial():
+    """Add a recorded audio file as a commercial fingerprint to Emy"""
+    try:
+        data = request.json
+        audio_file = data.get('filename')
+        title = data.get('title', 'Commercial')
+        track_id = data.get('track_id', f"commercial_{int(time.time())}")
+        
+        if not audio_file or not os.path.exists(audio_file):
+            return jsonify({'success': False, 'error': 'Audio file not found'}), 400
+        
+        add_log(f'Adding commercial "{title}" to fingerprint database...', 'info')
+        
+        success = fingerprint_client.add_fingerprint(
+            audio_file=audio_file,
+            track_id=track_id,
+            title=title,
+            artist='Commercial',
+            media_type='Audio'
+        )
+        
+        if success:
+            add_log(f'Successfully added commercial: {title}', 'success')
+            return jsonify({'success': True, 'track_id': track_id})
+        else:
+            add_log(f'Failed to add commercial: {title}', 'error')
+            return jsonify({'success': False, 'error': 'Failed to add fingerprint'}), 500
+            
+    except Exception as e:
+        add_log(f'Error adding commercial: {str(e)}', 'error')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @socketio.on('connect')
 def handle_connect():
     emit('status_update', {
@@ -250,4 +303,4 @@ def handle_connect():
 if __name__ == '__main__':
     os.makedirs('/recordings', exist_ok=True)
     os.makedirs('/data', exist_ok=True)
-    socketio.run(app, host='0.0.0.0', port=8080, debug=False, allow_unsafe_werkzeug=True)
+    socketio.run(app, host='0.0.0.0', port=8080, debug=False)

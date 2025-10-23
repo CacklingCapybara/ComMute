@@ -1,5 +1,3 @@
-
-
 import subprocess
 import platform
 import logging
