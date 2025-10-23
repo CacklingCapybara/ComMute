@@ -1,16 +1,9 @@
-
-# =============================================================================
-# docker-compose.yml - Docker Compose Configuration
-# =============================================================================
-
-# version: '3.8'
-
 services:
   commute:
     build: .
     container_name: commute
     ports:
-      - "8080:8080"
+      - "8085:8080"
     volumes:
       - ./recordings:/recordings
       - ./data:/data
@@ -27,12 +20,14 @@ services:
     restart: unless-stopped
 
   soundfingerprinting:
-    image: soundfingerprinting.emy:latest
+    image: addictedcs/soundfingerprinting.emy:latest
     container_name: soundfingerprinting
     ports:
       - "5000:5000"
+      - "3399:3399"
+      - "3340:3340"
     volumes:
-      - ./fingerprints:/data
+      - /docker/composefiles/soundfingerprint/persistentprints:/app/data
     networks:
       - commute-network
     restart: unless-stopped
@@ -40,8 +35,3 @@ services:
 networks:
   commute-network:
     driver: bridge
-
-volumes:
-  recordings:
-  data:
-  fingerprints:

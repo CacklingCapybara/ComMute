@@ -1,6 +1,4 @@
-# =============================================================================
-# app.py - Main Flask Application
-# =============================================================================
+
 
 from flask import Flask, render_template, jsonify, request, send_file
 from flask_socketio import SocketIO, emit
