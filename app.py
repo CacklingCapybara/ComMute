@@ -303,4 +303,4 @@ def handle_connect():
 if __name__ == '__main__':
     os.makedirs('/recordings', exist_ok=True)
     os.makedirs('/data', exist_ok=True)
-    socketio.run(app, host='0.0.0.0', port=8080, debug=False)
+    socketio.run(app, host='0.0.0.0', port=8080, debug=False, allow_unsafe_werkzeug=True)
