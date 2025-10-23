@@ -7,6 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class FingerprintClient:
     def __init__(self):
         self.endpoint = 'http://10.68.92.170:3340'
@@ -18,12 +19,13 @@ class FingerprintClient:
     def test_connection(self):
         try:
             #Below is my custom code
-            url = "http://10.68.92.170:3340/api/v1/Streams"
+
+            # url = "http://10.68.92.170:3340/api/v1/Streams"
             headers = {
                 "accept": "application/json",
                 "authorization": "Basic YWRtaW46"
             }
-
+            url = "http://10.68.92.170:3340/api/v1/Streams"
             response = requests.get(url, headers=headers)
             print(response.text)
 
@@ -49,7 +51,6 @@ class FingerprintClient:
             response = requests.post(
                 f"{self.endpoint}/match",
                 json=payload,
-                timeout=self.timeout
             )
             
             if response.status_code == 200:
