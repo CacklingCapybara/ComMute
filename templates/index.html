@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,28 +8,20 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.5;
-            }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
-
         .animate-pulse-slow {
             animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
     </style>
 </head>
-
 <body class="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white min-h-screen">
     <div id="app" class="container mx-auto p-6 max-w-6xl"></div>
 
     <script>
         const socket = io();
+
         let appState = {
             status: 'idle',
             isRunning: false,
@@ -42,7 +33,13 @@
                 falsePositives: 0
             },
             activityLog: [],
-            config: {},
+            config: {
+                audio_device: 'default',
+                matching_threshold: 0.85,
+                docker_endpoint: '',
+                recording_duration: 15,
+                latency_target: 1.5
+            },
             showSettings: false
         };
 
@@ -68,44 +65,31 @@
         async function fetchStatus() {
             const res = await fetch('/api/status');
             const data = await res.json();
-            appState = {
-                ...appState,
-                ...data
-            };
+            appState = { ...appState, ...data };
             render();
         }
 
         async function startMonitoring() {
-            await fetch('/api/start', {
-                method: 'POST'
-            });
+            await fetch('/api/start', { method: 'POST' });
             fetchStatus();
         }
 
         async function stopMonitoring() {
-            await fetch('/api/stop', {
-                method: 'POST'
-            });
+            await fetch('/api/stop', { method: 'POST' });
             fetchStatus();
         }
 
         async function recordAudio() {
-            await fetch('/api/record', {
-                method: 'POST'
-            });
+            await fetch('/api/record', { method: 'POST' });
         }
 
         async function testDocker() {
-            await fetch('/api/test-docker', {
-                method: 'POST'
-            });
+            await fetch('/api/test-docker', { method: 'POST' });
         }
 
         async function clearData() {
             if (confirm('Clear all activity logs and statistics?')) {
-                await fetch('/api/clear-data', {
-                    method: 'POST'
-                });
+                await fetch('/api/clear-data', { method: 'POST' });
                 fetchStatus();
             }
         }
@@ -113,9 +97,7 @@
         async function saveConfig() {
             await fetch('/api/config', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(appState.config)
             });
         }
@@ -133,142 +115,150 @@
                     <div class="flex items-center gap-3">
                         <div class="bg-purple-600 p-3 rounded-lg">
                             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clip-rule="evenodd">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2">
-                            
-                        
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clip-rule="evenodd" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                            </svg>
+                        </div>
                         <div>
-                            <h1 class="text-3xl font-bold">ComMute
-                            <p class="text-purple-300 text-sm">Commercial Detection & Mute System v1.0
-                        
-                    
-                    <button onclick="appState.showSettings = !appState.showSettings; render();" class="p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
+                            <h1 class="text-3xl font-bold">ComMute</h1>
+                            <p class="text-purple-300 text-sm">Commercial Detection & Mute System v1.0</p>
+                        </div>
+                    </div>
+                    <button id="toggleSettingsBtn" class="p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z">
-                        
-                    
-                
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066
+                                     c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572
+                                     c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573
+                                     c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065
+                                     c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066
+                                     c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572
+                                     c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573
+                                     c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                </div>
 
                 ${appState.showSettings ? `
                 <div class="bg-slate-800 rounded-lg p-6 mb-6 border border-purple-500/30">
-                    <h2 class="text-xl font-bold mb-4">Configuration
+                    <h2 class="text-xl font-bold mb-4">Configuration</h2>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm text-purple-300 mb-2">Audio Device
-                            <select onchange="appState.config.audio_device = this.value" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
-                                <option value="default">Default Audio Device
-                                <option value="hdmi">HDMI Audio
-                                <option value="line-in">Line In
-                                <option value="microphone">Microphone
-                            
-                        
+                            <label class="block text-sm text-purple-300 mb-2">Audio Device</label>
+                            <select id="audioSelect" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
+                                <option value="default" ${appState.config.audio_device === 'default' ? 'selected' : ''}>Default Audio Device</option>
+                                <option value="hdmi" ${appState.config.audio_device === 'hdmi' ? 'selected' : ''}>HDMI Audio</option>
+                                <option value="line-in" ${appState.config.audio_device === 'line-in' ? 'selected' : ''}>Line In</option>
+                                <option value="microphone" ${appState.config.audio_device === 'microphone' ? 'selected' : ''}>Microphone</option>
+                            </select>
+                        </div>
                         <div>
-                            <label class="block text-sm text-purple-300 mb-2">Matching Threshold: ${appState.config.matching_threshold}
-                            <input type="range" min="0.7" max="0.95" step="0.05" value="${appState.config.matching_threshold}" 
-                                   onchange="appState.config.matching_threshold = parseFloat(this.value); render();" class="w-full">
-                        
+                            <label class="block text-sm text-purple-300 mb-2">
+                                Matching Threshold: ${appState.config.matching_threshold.toFixed(2)}
+                            </label>
+                            <input id="thresholdRange" type="range" min="0.7" max="0.95" step="0.05"
+                                   value="${appState.config.matching_threshold}" class="w-full">
+                        </div>
                         <div>
-                            <label class="block text-sm text-purple-300 mb-2">Docker Endpoint
-                            <input type="text" value="${appState.config.docker_endpoint}" 
-                                   onchange="appState.config.docker_endpoint = this.value" 
+                            <label class="block text-sm text-purple-300 mb-2">Docker Endpoint</label>
+                            <input id="dockerInput" type="text" value="${appState.config.docker_endpoint}"
                                    class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
-                        
+                        </div>
                         <div>
-                            <label class="block text-sm text-purple-300 mb-2">Recording Duration (seconds)
-                            <input type="number" value="${appState.config.recording_duration}" 
-                                   onchange="appState.config.recording_duration = parseInt(this.value)" 
+                            <label class="block text-sm text-purple-300 mb-2">Recording Duration (seconds)</label>
+                            <input id="recordDuration" type="number" value="${appState.config.recording_duration}"
                                    class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-white">
-                        
-                    
+                        </div>
+                    </div>
                     <div class="flex gap-3 mt-4">
-                        <button onclick="testDocker()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                        <button id="testDockerBtn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
                             Test Docker Connection
-                        
-                        <button onclick="saveConfig()" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
+                        </button>
+                        <button id="saveConfigBtn" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors">
                             Save Configuration
-                        
-                    
-                
+                        </button>
+                    </div>
+                </div>
                 ` : ''}
 
                 <div class="grid grid-cols-3 gap-6 mb-6">
                     <div class="bg-slate-800 rounded-lg p-6 border border-purple-500/30 col-span-2">
                         <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-xl font-bold">System Status
+                            <h2 class="text-xl font-bold">System Status</h2>
                             <div class="px-3 py-1 rounded-full text-sm font-medium ${
                                 appState.status === 'listening' ? 'bg-green-500/20 text-green-400' :
                                 appState.status === 'muted' ? 'bg-red-500/20 text-red-400' :
                                 'bg-slate-700 text-slate-400'
                             }">
-                                &#9679; ${appState.status.toUpperCase()}
-                            
-                        
-                        
+                                ● ${appState.status.toUpperCase()}
+                            </div>
+                        </div>
+
                         <div class="flex items-center justify-center py-8">
-                            <svg class="w-24 h-24 ${appState.status === 'listening' ? 'text-green-400 animate-pulse-slow' : appState.status === 'muted' ? 'text-red-400 animate-pulse-slow' : 'text-slate-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                ${appState.status === 'muted' ? 
-                                    '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z">'
+                            <svg class="w-24 h-24 ${
+                                appState.status === 'listening' ? 'text-green-400 animate-pulse-slow' :
+                                appState.status === 'muted' ? 'text-red-400 animate-pulse-slow' :
+                                'text-slate-600'
+                            }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                ${appState.status === 'muted'
+                                    ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path>'
+                                    : ''
                                 }
-                            
-                        
+                            </svg>
+                        </div>
 
                         ${appState.currentMute ? `
                         <div class="mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                             <p class="text-red-300 text-center">
                                 Commercial muted for ${appState.currentMute.duration} seconds
-                            
-                        
+                            </p>
+                        </div>
                         ` : ''}
 
                         <div class="flex gap-3 mt-6">
-                            <button onclick="${appState.isRunning ? 'stopMonitoring()' : 'startMonitoring()'}" 
+                            <button id="startStopBtn"
                                     class="flex-1 px-6 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                                         appState.isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
                                     }">
                                 ${appState.isRunning ? 'Stop Monitoring' : 'Start Monitoring'}
-                            
-                            <button onclick="recordAudio()" 
+                            </button>
+                            <button id="recordBtn"
                                     class="px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition-colors"
                                     title="Record 15 seconds of audio for fingerprinting">
                                 Record
-                            
-                        
-                    
+                            </button>
+                        </div>
+                    </div>
 
                     <div class="bg-slate-800 rounded-lg p-6 border border-purple-500/30">
-                        <h2 class="text-xl font-bold mb-4">Statistics
+                        <h2 class="text-xl font-bold mb-4">Statistics</h2>
                         <div class="space-y-4">
-                            <div>
-                                <p class="text-sm text-purple-300">Total Mutes
-                                <p class="text-2xl font-bold">${appState.stats.totalMutes || 0}
-                            
-                            <div>
-                                <p class="text-sm text-purple-300">Time Muted
-                                <p class="text-2xl font-bold">${formatTime(appState.stats.totalMutedTime || 0)}
-                            
-                            <div>
-                                <p class="text-sm text-purple-300">Accuracy
-                                <p class="text-2xl font-bold">${(appState.stats.detectionAccuracy || 0).toFixed(1)}%
-                            
-                            <div>
-                                <p class="text-sm text-purple-300">False Positives
-                                <p class="text-2xl font-bold">${appState.stats.falsePositives || 0}
-                            
-                        
-                        <button onclick="clearData()" 
+                            <div><p class="text-sm text-purple-300">Total Mutes</p>
+                                <p class="text-2xl font-bold">${appState.stats.totalMutes}</p></div>
+                            <div><p class="text-sm text-purple-300">Time Muted</p>
+                                <p class="text-2xl font-bold">${formatTime(appState.stats.totalMutedTime)}</p></div>
+                            <div><p class="text-sm text-purple-300">Accuracy</p>
+                                <p class="text-2xl font-bold">${(appState.stats.detectionAccuracy || 0).toFixed(1)}%</p></div>
+                            <div><p class="text-sm text-purple-300">False Positives</p>
+                                <p class="text-2xl font-bold">${appState.stats.falsePositives}</p></div>
+                        </div>
+                        <button id="clearDataBtn"
                                 class="w-full mt-4 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition-colors">
                             Clear Data
-                        
-                    
-                
+                        </button>
+                    </div>
+                </div>
 
                 <div class="bg-slate-800 rounded-lg p-6 border border-purple-500/30">
-                    <h2 class="text-xl font-bold mb-4">Activity Log
+                    <h2 class="text-xl font-bold mb-4">Activity Log</h2>
                     <div class="space-y-2 max-h-96 overflow-y-auto">
-                        ${appState.activityLog.length === 0 ? 
-                            '<p class="text-slate-500 text-center py-8">No activity yet. Start monitoring to see logs.' :
-                            appState.activityLog.map(log => `
+                        ${appState.activityLog.length === 0 
+                            ? '<p class="text-slate-500 text-center py-8">No activity yet. Start monitoring to see logs.</p>'
+                            : appState.activityLog.map(log => `
                                 <div class="p-3 rounded-lg border ${
                                     log.type === 'mute' ? 'bg-red-500/10 border-red-500/30 text-red-300' :
                                     log.type === 'unmute' ? 'bg-green-500/10 border-green-500/30 text-green-300' :
@@ -277,20 +267,51 @@
                                     'bg-slate-700/50 border-slate-600/30'
                                 }">
                                     <div class="flex justify-between items-start">
-                                        <span class="text-sm">${log.message}
-                                        <span class="text-xs opacity-70 ml-2">${log.timestamp}
-                                    
-                                
-                            `).join('')
-                        }
-                    
-                
+                                        <span class="text-sm">${log.message}</span>
+                                        <span class="text-xs opacity-70 ml-2">${log.timestamp}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
 
                 <div class="mt-6 text-center text-sm text-purple-300">
-                    <p>ComMute uses soundfingerprinting.emy Docker container for commercial detection
-                    <p class="mt-1">Target latency: &le;${appState.config.latency_target}s | Threshold: ${appState.config.matching_threshold} | Recording: ${appState.config.recording_duration}s
-                
+                    <p>ComMute uses the soundfingerprinting.emy Docker container for commercial detection</p>
+                    <p class="mt-1">Target latency: ≤${appState.config.latency_target}s |
+                        Threshold: ${appState.config.matching_threshold} |
+                        Recording: ${appState.config.recording_duration}s</p>
+                </div>
             `;
+
+            // === Event listeners ===
+            document.getElementById('toggleSettingsBtn')?.addEventListener('click', () => {
+                appState.showSettings = !appState.showSettings;
+                render();
+            });
+
+            document.getElementById('startStopBtn')?.addEventListener('click', () => {
+                appState.isRunning ? stopMonitoring() : startMonitoring();
+            });
+
+            document.getElementById('recordBtn')?.addEventListener('click', recordAudio);
+            document.getElementById('testDockerBtn')?.addEventListener('click', testDocker);
+            document.getElementById('saveConfigBtn')?.addEventListener('click', saveConfig);
+            document.getElementById('clearDataBtn')?.addEventListener('click', clearData);
+
+            // Config controls
+            document.getElementById('audioSelect')?.addEventListener('change', e => {
+                appState.config.audio_device = e.target.value;
+            });
+            document.getElementById('thresholdRange')?.addEventListener('input', e => {
+                appState.config.matching_threshold = parseFloat(e.target.value);
+                render();
+            });
+            document.getElementById('dockerInput')?.addEventListener('input', e => {
+                appState.config.docker_endpoint = e.target.value;
+            });
+            document.getElementById('recordDuration')?.addEventListener('input', e => {
+                appState.config.recording_duration = parseInt(e.target.value);
+            });
         }
 
         // Initialize
@@ -298,5 +319,4 @@
         setInterval(fetchStatus, 5000);
     </script>
 </body>
-
 </html>
