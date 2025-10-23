@@ -1,0 +1,47 @@
+
+# =============================================================================
+# docker-compose.yml - Docker Compose Configuration
+# =============================================================================
+
+# version: '3.8'
+
+services:
+  commute:
+    build: .
+    container_name: commute
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./recordings:/recordings
+      - ./data:/data
+      - /dev/snd:/dev/snd  # Access to audio devices
+    devices:
+      - /dev/snd  # Audio device access
+    privileged: true  # Required for audio access
+    environment:
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+    networks:
+      - commute-network
+    depends_on:
+      - soundfingerprinting
+    restart: unless-stopped
+
+  soundfingerprinting:
+    image: soundfingerprinting.emy:latest
+    container_name: soundfingerprinting
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./fingerprints:/data
+    networks:
+      - commute-network
+    restart: unless-stopped
+
+networks:
+  commute-network:
+    driver: bridge
+
+volumes:
+  recordings:
+  data:
+  fingerprints:
