@@ -4,6 +4,11 @@ FROM python:3.11-slim
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     alsa-utils \
+    portaudio19-dev \
+    python3-dev \
+    build-essential \
+    libportaudio2 \
+    libportaudiocpp0 \
     libasound2-dev \
     portaudio19-dev \
     ffmpeg \
