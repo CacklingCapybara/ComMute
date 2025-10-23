@@ -9,15 +9,27 @@ logger = logging.getLogger(__name__)
 
 class FingerprintClient:
     def __init__(self):
-        self.endpoint = 'http://soundfingerprinting:5000'
-        self.timeout = 5
+        self.endpoint = 'http://10.68.92.170:3340'
+        self.timeout = 1
     
     def set_endpoint(self, endpoint):
         self.endpoint = endpoint
     
     def test_connection(self):
         try:
-            response = requests.get(f"{self.endpoint}/health", timeout=self.timeout)
+            #Below is my custom code
+            url = "http://10.68.92.170:3340/api/v1/Streams"
+            headers = {
+                "accept": "application/json",
+                "authorization": "Basic YWRtaW46"
+            }
+
+            response = requests.get(url, headers=headers)
+            print(response.text)
+
+
+            #Above is my custom code
+
             return response.status_code == 200
         except Exception as e:
             logger.error(f"Connection test failed: {e}")
